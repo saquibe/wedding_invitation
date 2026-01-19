@@ -288,7 +288,7 @@ export default function LoginPage() {
           </CardContent>
         </Card>
 
-        <div className="text-center mt-8 space-y-2">
+        {/* <div className="text-center mt-8 space-y-2">
           <p className="text-sm text-gray-600">Having trouble logging in?</p>
           <p className="text-sm">
             <a
@@ -298,7 +298,7 @@ export default function LoginPage() {
               Contact Support
             </a>
           </p>
-        </div>
+        </div> */}
       </div>
     </div>
   );
