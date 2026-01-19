@@ -23,6 +23,8 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [messageType, setMessageType] = useState<"email" | "mobile" | "">("");
+  const [testOtp, setTestOtp] = useState("");
   const router = useRouter();
 
   const handleSendOTP = async (e: React.FormEvent) => {
@@ -30,6 +32,7 @@ export default function LoginPage() {
     setLoading(true);
     setError("");
     setSuccess("");
+    setTestOtp("");
 
     try {
       const response = await fetch("/api/auth/send-otp", {
@@ -40,11 +43,16 @@ export default function LoginPage() {
 
       const data = await response.json();
 
-      // console.log(data);
+      // console.log("Send OTP response:", data);
 
       if (response.ok) {
         setSuccess(data.message);
+        setMessageType(data.type);
         setStep("otp");
+        if (data.testOtp) {
+          setTestOtp(data.testOtp);
+          // console.log("Test OTP (for development):", data.testOtp);
+        }
       } else {
         setError(data.error || "Failed to send OTP");
       }
@@ -67,6 +75,8 @@ export default function LoginPage() {
         redirect: false,
       });
 
+      // console.log("SignIn result:", result);
+
       if (result?.error) {
         setError("Invalid OTP. Please try again.");
       } else if (result?.ok) {
@@ -84,13 +94,43 @@ export default function LoginPage() {
     setOtp("");
     setError("");
     setSuccess("");
+    setMessageType("");
+    setTestOtp("");
+  };
+
+  const handleResendOTP = async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      const response = await fetch("/api/auth/send-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ identifier }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setSuccess(`OTP resent to your ${messageType}`);
+        if (data.testOtp) {
+          setTestOtp(data.testOtp);
+          // console.log("Resent OTP (for development):", data.testOtp);
+        }
+      } else {
+        setError(data.error || "Failed to resend OTP");
+      }
+    } catch (err: any) {
+      setError(err.message || "Something went wrong");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          {/* Branding Image */}
           <div className="relative w-full flex justify-center mb-10 mt-[-100px]">
             <Image
               src="/aoicon-image.jpeg"
@@ -99,34 +139,29 @@ export default function LoginPage() {
               height={140}
               priority
               className="
-        w-full
-        max-w-[280px]
-        sm:max-w-[340px]
-        md:max-w-[420px]
-        h-auto
-        object-contain
-      "
+                w-full
+                max-w-[280px]
+                sm:max-w-[340px]
+                md:max-w-[420px]
+                h-auto
+                object-contain
+              "
             />
           </div>
-
-          {/* <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900">
-            AOICON 2026
-          </h1>
-          <p className="text-sm sm:text-lg text-gray-600">KOLKATA</p> */}
         </div>
 
         <Card className="shadow-2xl border-0">
           <CardHeader className="space-y-1 pb-4">
-            <CardTitle className="text-xl text-center text-gray-600">
+            <CardTitle className="text-xl text-center text-gray-800">
               {step === "identifier"
-                ? "Enter your registered email or mobile number"
-                : "Enter the OTP sent to your email/mobile"}
+                ? "Enter your registered email or mobile"
+                : "Enter the OTP"}
             </CardTitle>
-            {/* <CardDescription className="text-center">
+            <CardDescription className="text-center">
               {step === "identifier"
-                ? "Enter your registered email or mobile number"
-                : "Enter the OTP sent to your email/mobile"}
-            </CardDescription> */}
+                ? "We'll send you a one-time password"
+                : `Sent to your ${messageType}`}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {error && (
@@ -141,8 +176,16 @@ export default function LoginPage() {
               </Alert>
             )}
 
+            {/* {testOtp && (
+              <Alert className="mb-4 bg-blue-50 text-blue-900 border-blue-200">
+                <AlertDescription className="font-mono">
+                  <strong>For testing:</strong> OTP is {testOtp}
+                </AlertDescription>
+              </Alert>
+            )} */}
+
             {step === "identifier" ? (
-              <form onSubmit={handleSendOTP} className="space-y-8">
+              <form onSubmit={handleSendOTP} className="space-y-6">
                 <div className="space-y-2">
                   <div className="relative">
                     <Input
@@ -159,9 +202,9 @@ export default function LoginPage() {
                       <Phone className="absolute left-3 top-4 h-5 w-5 text-gray-400" />
                     )}
                   </div>
-                  {/* <p className="text-xs text-gray-500 pl-1">
+                  <p className="text-xs text-gray-500 pl-1">
                     Enter your registered email or 10-digit mobile number
-                  </p> */}
+                  </p>
                 </div>
 
                 <Button
@@ -180,8 +223,8 @@ export default function LoginPage() {
                 </Button>
               </form>
             ) : (
-              <form onSubmit={handleVerifyOTP} className="space-y-4">
-                <div className="space-y-2">
+              <form onSubmit={handleVerifyOTP} className="space-y-6">
+                <div className="space-y-4">
                   <Input
                     type="text"
                     placeholder="Enter 6-digit OTP"
@@ -193,12 +236,17 @@ export default function LoginPage() {
                     maxLength={6}
                     required
                   />
-                  <p className="text-xs text-gray-500 text-center">
-                    OTP is valid for 10 minutes
-                  </p>
+                  <div className="text-center space-y-2">
+                    <p className="text-sm text-gray-500">
+                      OTP is valid for 10 minutes
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Sent to: {identifier}
+                    </p>
+                  </div>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <Button
                     type="submit"
                     className="w-full h-12 text-base bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-700 hover:to-blue-900"
@@ -214,35 +262,43 @@ export default function LoginPage() {
                     )}
                   </Button>
 
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full h-12 text-base"
-                    onClick={handleBack}
-                    disabled={loading}
-                  >
-                    Back
-                  </Button>
-                </div>
-
-                <div className="text-center">
-                  <button
-                    type="button"
-                    className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-                    onClick={handleSendOTP}
-                    disabled={loading}
-                  >
-                    Resend OTP
-                  </button>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-12"
+                      onClick={handleBack}
+                      disabled={loading}
+                    >
+                      Back
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-12"
+                      onClick={handleResendOTP}
+                      disabled={loading}
+                    >
+                      Resend OTP
+                    </Button>
+                  </div>
                 </div>
               </form>
             )}
           </CardContent>
         </Card>
 
-        <p className="text-center text-sm text-gray-600 mt-6">
-          Need help? Contact the registration team
-        </p>
+        <div className="text-center mt-8 space-y-2">
+          <p className="text-sm text-gray-600">Having trouble logging in?</p>
+          <p className="text-sm">
+            <a
+              href="mailto:support@registrationteam.in"
+              className="text-blue-600 hover:text-blue-800 font-medium"
+            >
+              Contact Support
+            </a>
+          </p>
+        </div>
       </div>
     </div>
   );

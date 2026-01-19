@@ -1,3 +1,4 @@
+// app/api/auth/send-otp/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getDatabase } from "@/lib/mongodb";
 import { generateOTP, generateOTPExpiry } from "@/lib/otp";
@@ -16,8 +17,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // console.log("\n================ SEND OTP ================");
+    // console.log("📱 Identifier:", identifier);
+
     const db = await getDatabase();
-    const usersCollection = db.collection("user_reg");
+    const usersCollection = db.collection("aoicon_certificate");
 
     const isEmail = identifier.includes("@");
     const isMobile = /^\d{10}$/.test(identifier);
@@ -29,75 +33,79 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // console.log("Searching for:", identifier);
-    // console.log("Is email:", isEmail);
-    // console.log("Is mobile:", isMobile);
+    // console.log("🔍 Searching in database...");
 
     let user;
     if (isEmail) {
-      // For email search - exact match
       user = await usersCollection.findOne({
-        "Email ID": identifier,
+        $or: [{ email: identifier }, { "Email ID": identifier }],
       });
     } else {
-      // For mobile search - convert to number
-      // Mobile numbers are stored as numbers (7331131070) not strings
-      // const mobileNumber = parseInt(identifier, 10);
       user = await usersCollection.findOne({
-        Mobile: identifier,
+        $or: [{ mobile: identifier }, { Mobile: identifier }],
       });
     }
 
-    // console.log("Query result:", user ? "FOUND" : "NOT FOUND");
-    // if (user) {
-    //   console.log("User found:", {
-    //     name: user["Full Name"],
-    //     email: user["Email ID"],
-    //     mobile: user["Mobile"],
-    //     mobileType: typeof user["Mobile"],
-    //   });
-    // }
-
     if (!user) {
+      // console.log("❌ User not found");
       return NextResponse.json(
         { error: "No registration found with this email/mobile number" },
         { status: 404 }
       );
     }
 
+    // console.log("✅ User found:", {
+    //   name: user.name,
+    //   email: user.email,
+    //   mobile: user.mobile,
+    //   uid: user.uid,
+    // });
+
     const otp = generateOTP();
     const otpExpiry = generateOTPExpiry();
 
-    await usersCollection.updateOne(
+    // console.log("🔢 Generated OTP:", otp, "(type:", typeof otp + ")");
+    // console.log("⏰ OTP Expiry:", otpExpiry.toISOString());
+
+    // Store OTP in database
+    const updateResult = await usersCollection.updateOne(
       { _id: user._id },
       {
         $set: {
-          otp,
-          otpExpiry,
+          otp: otp,
+          otpExpiry: otpExpiry,
         },
       }
     );
 
-    // console.log("OTP generated:", otp, "for:", identifier);
+    // console.log(
+    //   "💾 OTP stored in DB:",
+    //   updateResult.modifiedCount > 0 ? "Success" : "Failed"
+    // );
 
-    // For testing - skip actual email/SMS sending
-    // TODO: Uncomment when ready for production
+    // Verify OTP was stored
+    const verifyUser = await usersCollection.findOne({ _id: user._id });
+    // console.log("✅ Verified stored OTP:", verifyUser?.otp);
 
+    // Send OTP via SMS or Email
     if (isEmail) {
       await sendEmail(identifier, otp);
+      // console.log("📧 Email sent to:", identifier);
     } else {
       await sendSMS(identifier, otp);
+      // console.log("📱 SMS sent to:", identifier);
     }
+
+    // console.log("=========================================\n");
 
     return NextResponse.json({
       success: true,
       message: `OTP sent successfully to your ${isEmail ? "email" : "mobile"}`,
       type: isEmail ? "email" : "mobile",
-      // For testing - include OTP in response
-      testOtp: otp,
+      testOtp: otp, // For testing only
     });
   } catch (error: any) {
-    console.error("Send OTP error:", error);
+    console.error("❌ Send OTP error:", error);
     return NextResponse.json(
       { error: error.message || "Failed to send OTP" },
       { status: 500 }

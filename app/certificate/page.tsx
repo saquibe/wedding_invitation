@@ -1,4 +1,3 @@
-// app/certificate/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -20,7 +19,7 @@ export default function CertificatePage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [certificateUrl, setCertificateUrl] = useState("");
-  const [debugInfo, setDebugInfo] = useState("");
+  const [userData, setUserData] = useState<any>(null);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -31,33 +30,49 @@ export default function CertificatePage() {
   useEffect(() => {
     if (session?.user) {
       const user = session.user as any;
-      // console.log("Session user object:", user);
-      // console.log("All user properties:", Object.keys(user));
+      // console.log("Session user object on certificate page:", {
+      //   name: user.name,
+      //   email: user.email,
+      //   registrationNumber: user.registrationNumber,
+      //   mobile: user.mobile,
+      //   certUrl: user.certUrl,
+      //   allProps: Object.keys(user),
+      // });
 
-      // Try both property names
-      const url = user.certUrl || user.cert_url || "";
-      // console.log("Found certificate URL:", url);
+      // Try multiple possible field names for certificate URL
+      const possibleUrls = [
+        user.certUrl,
+        user.cert_url,
+        user.url,
+        (user as any).url,
+      ];
 
-      setCertificateUrl(url);
+      // console.log("Possible certificate URLs:", possibleUrls);
 
-      // Debug info
-      // setDebugInfo(`
-      //   certUrl: ${user.certUrl || "NOT FOUND"}
-      //   cert_url: ${user.cert_url || "NOT FOUND"}
-      //   Full session: ${JSON.stringify(user, null, 2)}
-      // `);
+      // Use the first non-empty URL
+      const foundUrl = possibleUrls.find((url) => url && url.trim() !== "");
+      // console.log("Selected certificate URL:", foundUrl);
+
+      setCertificateUrl(foundUrl || "");
+      setUserData(user);
     }
   }, [session]);
 
   const handleDownloadCertificate = async () => {
     if (!certificateUrl) {
       alert("Certificate URL not available. Please contact support.");
-      // console.log("Debug info:", debugInfo);
+      // console.log("User data for debugging:", userData);
       return;
     }
 
     setLoading(true);
     try {
+      // Validate URL
+      if (!certificateUrl.startsWith("http")) {
+        alert(`Invalid certificate URL: ${certificateUrl}`);
+        return;
+      }
+
       // Open certificate in new tab
       window.open(certificateUrl, "_blank");
     } catch (error) {
@@ -68,10 +83,31 @@ export default function CertificatePage() {
     }
   };
 
+  const handleContactSupport = () => {
+    const supportEmail = "support@registrationteam.in";
+    const subject = `Certificate Issue - ${
+      userData?.registrationNumber || "Unknown"
+    }`;
+    const body = `Hello,\n\nI'm having issues accessing my certificate.\n\nRegistration Number: ${
+      userData?.registrationNumber || "N/A"
+    }\nName: ${userData?.name || "N/A"}\nEmail: ${
+      userData?.email || "N/A"
+    }\n\nCertificate URL from system: ${
+      certificateUrl || "Not available"
+    }\n\nPlease assist.`;
+
+    window.location.href = `mailto:${supportEmail}?subject=${encodeURIComponent(
+      subject
+    )}&body=${encodeURIComponent(body)}`;
+  };
+
   if (status === "loading") {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-600">Loading your certificate...</p>
+        </div>
       </div>
     );
   }
@@ -83,34 +119,29 @@ export default function CertificatePage() {
   const user = session.user as any;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 flex items-center justify-center px-4 py-8">
       <div className="max-w-md w-full">
-        {/* <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-gray-900 mt-10 mb-1">
-            Download Certificate
-          </h1>
-          <p className="text-gray-600">AOICON 2026 • KOLKATA</p>
-        </div> */}
-
-        <Card className="overflow-hidden shadow-xl border border-gray-300">
-          <div className="bg-gradient-to-br  from-blue-600 to-blue-800 px-6 py-6 text-center">
-            <h2 className="text-xl font-bold text-white mb-2">
+        <Card className="overflow-hidden shadow-2xl border border-gray-300">
+          <div className="bg-gradient-to-br from-blue-600 to-blue-800 px-6 py-8 text-center">
+            <h2 className="text-2xl font-bold text-white mb-2">
               Download Certificate
             </h2>
-            <p className="text-green-100 text-sm">AOICON 2026 • KOLKATA</p>
+            <p className="text-blue-100">AOICON 2026 • KOLKATA</p>
           </div>
 
           <div className="p-6 space-y-6">
             {/* User Info */}
             <div className="text-center">
-              <h3 className="text-lg font-bold text-gray-900 mb-1">
+              <h3 className="text-xl font-bold text-gray-900 mb-2">
                 {user.name}
               </h3>
-              <div className="inline-block bg-gray-100 px-4 py-2 rounded-md mt-2">
-                <p className="text-sm font-medium text-gray-700">
-                  Registration:{" "}
-                  <span className="font-bold">{user.registrationNumber}</span>
-                </p>
+              <div className="inline-flex items-center bg-blue-50 px-4 py-2 rounded-lg border border-blue-100">
+                <span className="text-sm font-medium text-gray-700 mr-2">
+                  Reg No:
+                </span>
+                <span className="font-bold text-blue-800">
+                  {user.registrationNumber}
+                </span>
               </div>
             </div>
 
@@ -120,46 +151,40 @@ export default function CertificatePage() {
                 className={`flex items-center justify-center p-4 rounded-lg border ${
                   certificateUrl
                     ? "bg-green-50 border-green-200"
-                    : "bg-red-50 border-red-200"
+                    : "bg-yellow-50 border-yellow-200"
                 }`}
               >
-                <FileText
-                  className={`w-6 h-6 mr-3 ${
-                    certificateUrl ? "text-blue-600" : "text-red-600"
-                  }`}
-                />
+                {certificateUrl ? (
+                  <FileText className="w-6 h-6 mr-3 text-green-600" />
+                ) : (
+                  <AlertCircle className="w-6 h-6 mr-3 text-yellow-600" />
+                )}
                 <div className="text-left">
                   <p
                     className={`font-medium ${
-                      certificateUrl ? "text-blue-900" : "text-red-900"
+                      certificateUrl ? "text-green-900" : "text-yellow-900"
                     }`}
                   >
                     {certificateUrl
                       ? "Certificate Available"
-                      : "Certificate Not Available"}
+                      : "Certificate Not Found"}
                   </p>
                   <p
                     className={`text-sm ${
-                      certificateUrl ? "text-blue-700" : "text-red-700"
+                      certificateUrl ? "text-green-700" : "text-yellow-700"
                     }`}
                   >
                     {certificateUrl
                       ? "Click download to view your certificate"
-                      : "Please contact support for assistance"}
+                      : "URL not associated with registration"}
                   </p>
                 </div>
               </div>
 
-              {!certificateUrl && (
-                <div className="text-sm text-gray-600 bg-blue-50 p-3 rounded-lg border border-blue-100">
-                  <p className="font-medium text-blue-800 mb-1">
-                    Certificate Not Found?
-                  </p>
-                  <p>
-                    Your certificate URL might not be associated with your
-                    registration. Please contact the registration team for
-                    assistance.
-                  </p>
+              {certificateUrl && (
+                <div className="text-xs text-gray-500 bg-gray-50 p-3 rounded border">
+                  <p className="font-medium mb-1">Certificate URL:</p>
+                  <p className="break-all">{certificateUrl}</p>
                 </div>
               )}
             </div> */}
@@ -168,22 +193,34 @@ export default function CertificatePage() {
             <Button
               onClick={handleDownloadCertificate}
               disabled={loading || !certificateUrl}
-              className="w-full h-12 text-base bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-700 hover:to-blue-900"
+              className="w-full h-14 text-lg font-semibold bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-700 hover:to-blue-900 shadow-md"
             >
               {loading ? (
                 <>
-                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  <Loader2 className="mr-3 h-6 w-6 animate-spin" />
                   Opening Certificate...
                 </>
               ) : (
                 <>
-                  <Download className="mr-2 h-5 w-5" />
+                  <Download className="mr-3 h-6 w-6" />
                   {certificateUrl
                     ? "Download Certificate"
                     : "Certificate Not Available"}
                 </>
               )}
             </Button>
+
+            {/* Contact Support Button (only show if no certificate) */}
+            {!certificateUrl && (
+              <Button
+                onClick={handleContactSupport}
+                variant="outline"
+                className="w-full h-12 text-base border-yellow-500 text-yellow-600 hover:bg-yellow-50"
+              >
+                <AlertCircle className="mr-2 h-5 w-5" />
+                Contact Support
+              </Button>
+            )}
 
             {/* Back Button */}
             <Button
@@ -195,21 +232,15 @@ export default function CertificatePage() {
               Back to Login
             </Button>
 
-            {/* Contact Support */}
+            {/* Contact Info */}
             {/* <div className="text-center pt-4 border-t">
-              <p className="text-sm text-gray-500 mb-2">
-                Need help with your certificate?
+              <p className="text-sm text-gray-600 mb-3">
+                For any certificate-related issues, please contact:
               </p>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-blue-600 hover:text-blue-800"
-                onClick={() => {
-                  window.location.href = "mailto:support@registrationteam.in";
-                }}
-              >
-                Contact Support
-              </Button>
+              <div className="space-y-1 text-sm">
+                <p className="font-medium text-gray-800">Registration Team</p>
+                <p className="text-gray-600">support@registrationteam.in</p>
+              </div>
             </div> */}
           </div>
         </Card>
