@@ -12,7 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Search, Users, User } from "lucide-react";
+import { Loader2, Search, Users, User, PlusCircle } from "lucide-react";
 
 export default function HomePage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -63,7 +63,6 @@ export default function HomePage() {
 
   const handleGenerateMultiple = () => {
     if (searchResults.length > 0) {
-      // Pass all codes and names as arrays
       const codes = searchResults.map((r) => r.qr_code).join(",");
       const names = searchResults.map((r) => r.name).join("|");
       const mobiles = searchResults.map((r) => r.mobile_number).join(",");
@@ -74,14 +73,27 @@ export default function HomePage() {
     }
   };
 
+  const handleAddNewInvitation = () => {
+    router.push("/add-invitation");
+  };
+
   const isMobileSearch = /^\d{10}$/.test(searchTerm);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-red-50 p-4">
       <div className="max-w-4xl mx-auto pt-16">
-        {/* Header */}
+        {/* Header with Add Button */}
         <div className="text-center mb-10">
           <h1 className="text-5xl font-bold text-[#504943] mb-4 font-cinzel">
+            <div className="flex justify-end mb-4">
+              <Button
+                onClick={handleAddNewInvitation}
+                className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 font-cinzel"
+              >
+                <PlusCircle className="mr-2 h-5 w-5" />
+                Add New Invitation
+              </Button>
+            </div>
             Wedding Invitation
           </h1>
           <p className="text-xl text-gray-600 font-cinzel">
@@ -153,13 +165,13 @@ export default function HomePage() {
                             {searchResults.length} people
                           </p>
                         </div>
-                        {/* <Button
+                        <Button
                           onClick={handleGenerateMultiple}
                           className="bg-gradient-to-r from-amber-600 to-red-600"
                         >
                           <Users className="mr-2 h-4 w-4" />
                           Generate All ({searchResults.length})
-                        </Button> */}
+                        </Button>
                       </div>
                     </div>
 
@@ -246,6 +258,18 @@ export default function HomePage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Quick Actions */}
+        <div className="mt-6 text-center">
+          <Button
+            variant="link"
+            onClick={handleAddNewInvitation}
+            className="text-amber-600 hover:text-amber-800 font-cinzel"
+          >
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Need to add a new invitation? Click here
+          </Button>
+        </div>
 
         {/* Decorative Footer */}
         <div className="text-center mt-8 text-gray-500 font-cinzel text-sm">
