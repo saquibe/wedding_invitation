@@ -100,7 +100,7 @@ export default function GenerateFlyerPage() {
 
     // Position name - adjust these coordinates based on your frame
     const nameX = canvas.width / 2; // Center horizontally
-    const nameY = canvas.height * 0.53; // 47% from top (adjust as needed)
+    const nameY = canvas.height * 0.54; // 47% from top (adjust as needed)
 
     ctx.fillText(name.toUpperCase(), nameX, nameY);
 
