@@ -6,7 +6,6 @@ import { Cinzel } from "next/font/google";
 const cinzel = Cinzel({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
-  variable: "--font-cinzel",
 });
 
 export const metadata: Metadata = {
@@ -21,7 +20,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={`${cinzel.variable} font-sans`}>{children}</body>
+      <body className={cinzel.className}>{children}</body>
     </html>
   );
 }

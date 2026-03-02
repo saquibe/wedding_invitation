@@ -18,23 +18,29 @@ export default function GenerateFlyerPage() {
   const [frameImage, setFrameImage] = useState<HTMLImageElement | null>(null);
   const [qrImage, setQrImage] = useState<string>("");
   const [compositeImage, setCompositeImage] = useState<string>("");
+  const computedFont = getComputedStyle(document.body).fontFamily;
 
   useEffect(() => {
-    const code = searchParams.get("code");
-    const personName = searchParams.get("name");
+    const init = async () => {
+      const code = searchParams.get("code");
+      const personName = searchParams.get("name");
 
-    if (!code || !personName) {
-      router.push("/");
-      return;
-    }
+      if (!code || !personName) {
+        router.push("/");
+        return;
+      }
 
-    setQrCodeData(code);
-    setName(decodeURIComponent(personName));
+      setQrCodeData(code);
+      setName(decodeURIComponent(personName));
 
-    // Load frame and generate QR
-    Promise.all([loadFrameImage(), generateQRCode(code)]).then(() => {
+      // 🔥 Ensure Cinzel font is loaded before drawing
+      await document.fonts.load('bold 40px "Cinzel"');
+
+      await Promise.all([loadFrameImage(), generateQRCode(code)]);
       setLoading(false);
-    });
+    };
+
+    init();
   }, [searchParams, router]);
 
   const loadFrameImage = (): Promise<void> => {
@@ -87,7 +93,7 @@ export default function GenerateFlyerPage() {
     ctx.drawImage(frameImage, 0, 0, canvas.width, canvas.height);
 
     // Draw name
-    ctx.font = 'bold 40px "Cinzel", serif';
+    ctx.font = `bold 50px ${computedFont}`;
     ctx.fillStyle = "#504943";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
@@ -96,7 +102,7 @@ export default function GenerateFlyerPage() {
     const nameX = canvas.width / 2; // Center horizontally
     const nameY = canvas.height * 0.53; // 47% from top (adjust as needed)
 
-    ctx.fillText(name, nameX, nameY);
+    ctx.fillText(name.toUpperCase(), nameX, nameY);
 
     // Load and draw QR code
     const qrImg = new window.Image();
