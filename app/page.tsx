@@ -104,7 +104,7 @@ export default function HomePage() {
               <div className="relative">
                 <Input
                   type="text"
-                  placeholder="e.g., Dr. Vijay Patil or 9920755555"
+                  placeholder="e.g., Your Name or 1234567890"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-12 h-14 text-lg border-2 border-amber-200 focus:border-amber-400"
