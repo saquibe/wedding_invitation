@@ -1,18 +1,11 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import {
-  Loader2,
-  ArrowLeft,
-  Download,
-  DownloadCloud,
-  Users,
-} from "lucide-react";
+import { Loader2, ArrowLeft, Download, DownloadCloud } from "lucide-react";
 import QRCode from "qrcode";
-import html2canvas from "html2canvas";
 import JSZip from "jszip";
 
 export default function GenerateMultiplePage() {
@@ -21,11 +14,34 @@ export default function GenerateMultiplePage() {
 
   const [loading, setLoading] = useState(true);
   const [flyers, setFlyers] = useState<
-    Array<{ name: string; code: string; mobile: string; qrImage: string }>
+    Array<{
+      name: string;
+      code: string;
+      mobile: string;
+      compositeImage: string;
+    }>
   >([]);
   const [downloading, setDownloading] = useState(false);
-  const flyerRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+  const [frameImage, setFrameImage] = useState<HTMLImageElement | null>(null);
+  const [frameLoaded, setFrameLoaded] = useState(false);
+  const [params, setParams] = useState<{
+    codes: string[];
+    names: string[];
+    mobiles: string[];
+  } | null>(null);
 
+  // Load frame image
+  useEffect(() => {
+    const img = new window.Image();
+    img.crossOrigin = "anonymous";
+    img.src = "/frame.jpeg";
+    img.onload = () => {
+      setFrameImage(img);
+      setFrameLoaded(true);
+    };
+  }, []);
+
+  // Get URL params
   useEffect(() => {
     const codes = searchParams.get("codes");
     const names = searchParams.get("names");
@@ -36,104 +52,127 @@ export default function GenerateMultiplePage() {
       return;
     }
 
-    const codeArray = codes.split(",");
-    const nameArray = names.split("|");
-    const mobileArray = mobiles ? mobiles.split(",") : [];
-
-    loadAllQRs(codeArray, nameArray, mobileArray);
+    setParams({
+      codes: codes.split(","),
+      names: names.split("|"),
+      mobiles: mobiles ? mobiles.split(",") : [],
+    });
   }, [searchParams, router]);
 
-  const loadAllQRs = async (
+  useEffect(() => {
+    if (frameLoaded && params && loading) {
+      loadAllFlyers(params.codes, params.names, params.mobiles);
+    }
+  }, [frameLoaded, params, loading]);
+
+  const createCompositeImage = async (
+    frame: HTMLImageElement,
+    name: string,
+    qrDataURL: string,
+  ): Promise<string> => {
+    // 🔥 Ensure Cinzel font is fully loaded
+    await document.fonts.load("700 50px Cinzel");
+
+    const canvas = document.createElement("canvas");
+    canvas.width = frame.width;
+    canvas.height = frame.height;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Canvas context failed");
+
+    ctx.drawImage(frame, 0, 0, canvas.width, canvas.height);
+
+    // ✅ Premium Cinzel usage
+    ctx.font = "700 50px Cinzel";
+    ctx.fillStyle = "#504943";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+
+    const nameX = canvas.width / 2;
+    const nameY = canvas.height * 0.53;
+
+    ctx.fillText(name.toUpperCase(), nameX, nameY);
+
+    const qrImg = new window.Image();
+    qrImg.crossOrigin = "anonymous";
+    qrImg.src = qrDataURL;
+
+    await new Promise((res, rej) => {
+      qrImg.onload = res;
+      qrImg.onerror = rej;
+    });
+
+    const qrSize = 285;
+    const qrX = (canvas.width - qrSize) / 2;
+    const qrY = canvas.height * 0.59;
+
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fillRect(qrX - 5, qrY - 5, qrSize + 10, qrSize + 10);
+    ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
+
+    return canvas.toDataURL("image/png");
+  };
+
+  const loadAllFlyers = async (
     codes: string[],
     names: string[],
     mobiles: string[],
   ) => {
+    if (!frameImage) return;
+
     const flyerData = [];
 
     for (let i = 0; i < codes.length; i++) {
-      try {
-        const qrDataURL = await QRCode.toDataURL(codes[i], {
-          width: 200,
-          margin: 1,
-          color: {
-            dark: "#000000",
-            light: "#FFFFFF",
-          },
-        });
+      const qrDataURL = await QRCode.toDataURL(codes[i]);
 
-        flyerData.push({
-          name: names[i],
-          code: codes[i],
-          mobile: mobiles[i] || "",
-          qrImage: qrDataURL,
-        });
-      } catch (err) {
-        console.error(`Failed to generate QR for ${codes[i]}:`, err);
-      }
+      const compositeImage = await createCompositeImage(
+        frameImage,
+        names[i],
+        qrDataURL,
+      );
+
+      flyerData.push({
+        name: names[i].toUpperCase(),
+        code: codes[i],
+        mobile: mobiles[i] || "",
+        compositeImage,
+      });
     }
 
     setFlyers(flyerData);
     setLoading(false);
   };
 
-  const downloadSingle = async (code: string) => {
-    const element = flyerRefs.current[code];
-    if (!element) return;
-
-    try {
-      const canvas = await html2canvas(
-        element as HTMLElement,
-        {
-          scale: 2,
-          backgroundColor: null,
-          allowTaint: true,
-          useCORS: true,
-        } as any,
-      );
-
-      const link = document.createElement("a");
-      link.download = `wedding-flyer-${code}.png`;
-      link.href = canvas.toDataURL("image/png");
-      link.click();
-    } catch (err) {
-      console.error("Download failed:", err);
-    }
+  const downloadSingle = (
+    compositeImage: string,
+    name: string,
+    code: string,
+  ) => {
+    const link = document.createElement("a");
+    link.download = `wedding-${name.replace(/\s+/g, "_")}-${code}.png`;
+    link.href = compositeImage;
+    link.click();
   };
 
   const downloadAll = async () => {
     setDownloading(true);
+
     const zip = new JSZip();
 
     for (const flyer of flyers) {
-      const element = flyerRefs.current[flyer.code];
-      if (element) {
-        try {
-          const canvas = await html2canvas(
-            element as HTMLElement,
-            {
-              scale: 2,
-              backgroundColor: null,
-              allowTaint: true,
-              useCORS: true,
-            } as any,
-          );
-
-          const imgData = canvas.toDataURL("image/png").split(",")[1];
-          zip.file(
-            `flyer-${flyer.name.replace(/\s+/g, "_")}-${flyer.code}.png`,
-            imgData,
-            { base64: true },
-          );
-        } catch (err) {
-          console.error(`Failed to capture ${flyer.code}:`, err);
-        }
-      }
+      const base64Data = flyer.compositeImage.split(",")[1];
+      zip.file(
+        `wedding-${flyer.name.replace(/\s+/g, "_")}-${flyer.code}.png`,
+        base64Data,
+        { base64: true },
+      );
     }
 
     const content = await zip.generateAsync({ type: "blob" });
+
     const link = document.createElement("a");
     link.href = URL.createObjectURL(content);
-    link.download = "all-family-flyers.zip";
+    link.download = "all-wedding-flyers.zip";
     link.click();
 
     setDownloading(false);
@@ -141,8 +180,8 @@ export default function GenerateMultiplePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-10 w-10 animate-spin text-amber-600" />
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 via-orange-50 to-red-50">
+        <Loader2 className="h-12 w-12 animate-spin text-amber-600" />
       </div>
     );
   }
@@ -153,7 +192,7 @@ export default function GenerateMultiplePage() {
         <div className="flex justify-between items-center mb-6">
           <Button variant="ghost" onClick={() => router.push("/")}>
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Search
+            Back
           </Button>
 
           {flyers.length > 1 && (
@@ -162,104 +201,46 @@ export default function GenerateMultiplePage() {
               disabled={downloading}
               className="bg-gradient-to-r from-amber-600 to-red-600"
             >
-              {downloading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creating ZIP...
-                </>
-              ) : (
-                <>
-                  <DownloadCloud className="mr-2 h-4 w-4" />
-                  Download All ({flyers.length})
-                </>
-              )}
+              <DownloadCloud className="mr-2 h-4 w-4" />
+              Download All ({flyers.length})
             </Button>
           )}
         </div>
 
         <div className="text-center mb-8">
-          <h2 className="text-3xl font-bold text-[#504943] mb-2 font-cinzel">
+          <h2 className="text-3xl font-bold text-[#504943] font-cinzel">
             Family Wedding Flyers
           </h2>
-          <p className="text-gray-600">
-            Found {flyers.length} family member{flyers.length > 1 ? "s" : ""}
-          </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {flyers.map((flyer) => (
-            <Card key={flyer.code} className="p-4 bg-white">
+            <Card key={flyer.code} className="p-4 bg-white/95">
               <div className="text-center mb-4">
-                <h3 className="font-cinzel text-[#504943] font-semibold text-lg">
+                <h3 className="font-cinzel text-[#504943] font-semibold text-lg tracking-wide">
                   {flyer.name}
                 </h3>
-                <p className="text-xs text-gray-500">Code: {flyer.code}</p>
               </div>
 
-              {/* Flyer Preview */}
-              <div
-                ref={(el) => {
-                  flyerRefs.current[flyer.code] = el;
-                }}
-                className="relative w-full aspect-[4/3] overflow-hidden rounded-lg shadow-lg mb-4"
-                style={{
-                  backgroundImage: "url('/frame.jpg')",
-                  backgroundSize: "cover",
-                  backgroundPosition: "center",
-                }}
-              >
-                {/* Name Overlay */}
-                <div
-                  className="absolute"
-                  style={{
-                    top: "45%",
-                    left: "50%",
-                    transform: "translateX(-50%)",
-                    width: "100%",
-                    textAlign: "center",
-                  }}
-                >
-                  <span
-                    className="font-cinzel"
-                    style={{
-                      fontSize: "19px",
-                      color: "#504943",
-                      fontWeight: 500,
-                    }}
-                  >
-                    {flyer.name}
-                  </span>
-                </div>
-
-                {/* QR Code Overlay */}
-                <div
-                  className="absolute"
-                  style={{
-                    top: "60%",
-                    left: "50%",
-                    transform: "translateX(-50%)",
-                    width: "100px",
-                    height: "100px",
-                    backgroundColor: "white",
-                    padding: "6px",
-                    borderRadius: "6px",
-                  }}
-                >
+              <div className="mb-4 flex justify-center">
+                <div className="rounded-xl shadow-lg overflow-hidden border-2 border-amber-100">
                   <img
-                    src={flyer.qrImage}
-                    alt="QR Code"
-                    className="w-full h-full"
+                    src={flyer.compositeImage}
+                    alt={flyer.name}
+                    className="w-full max-h-[300px] object-contain"
                   />
                 </div>
               </div>
 
               <Button
-                onClick={() => downloadSingle(flyer.code)}
+                onClick={() =>
+                  downloadSingle(flyer.compositeImage, flyer.name, flyer.code)
+                }
                 variant="outline"
-                className="w-full border-amber-500 text-amber-700 hover:bg-amber-50"
+                className="w-full border-amber-500 text-amber-700 font-cinzel"
               >
                 <Download className="mr-2 h-4 w-4" />
-                Download {flyer.name.split(" ")[0]}'s Flyer
+                Download
               </Button>
             </Card>
           ))}
