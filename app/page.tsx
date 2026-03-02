@@ -153,13 +153,13 @@ export default function HomePage() {
                             {searchResults.length} people
                           </p>
                         </div>
-                        <Button
+                        {/* <Button
                           onClick={handleGenerateMultiple}
                           className="bg-gradient-to-r from-amber-600 to-red-600"
                         >
                           <Users className="mr-2 h-4 w-4" />
                           Generate All ({searchResults.length})
-                        </Button>
+                        </Button> */}
                       </div>
                     </div>
 
