@@ -1,13 +1,17 @@
+// app/layout.tsx
 import "./globals.css";
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
-import { Providers } from "./providers";
+import { Cinzel } from "next/font/google";
 
-const inter = Inter({ subsets: ["latin"] });
+const cinzel = Cinzel({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-cinzel",
+});
 
 export const metadata: Metadata = {
-  title: "AOICON 2026 KOLKATA - Certificate",
-  description: "Access your AOICON 2026 KOLKATA certificate here.",
+  title: "Wedding Invitation Flyer Generator",
+  description: "Generate wedding invitation flyers with QR codes",
 };
 
 export default function RootLayout({
@@ -17,9 +21,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={inter.className}>
-        <Providers>{children}</Providers>
-      </body>
+      <body className={`${cinzel.variable} font-sans`}>{children}</body>
     </html>
   );
 }
